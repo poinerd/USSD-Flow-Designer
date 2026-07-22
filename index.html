@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>USSD Flow Canvas Prototype</title>
+<link rel="stylesheet" href="style.css">
+<body>
+
+  <aside id="sidebar">
+    <h2>USSD Palette</h2>
+    <div class="palette-item" draggable="true" data-type="start">
+      <span>●</span> Start (Circle)
+    </div>
+    <div class="palette-item" draggable="true" data-type="container">
+      <span>▭</span> Container (Rectangle)
+    </div>
+    <div class="palette-item" draggable="true" data-type="text">
+      <span>T</span> Text Node (Canvas / Embeddable)
+    </div>
+    <div class="palette-item" draggable="true" data-type="input">
+      <span>▢</span> Input Node (Canvas / Embeddable)
+    </div>
+    <div class="palette-item" draggable="true" data-type="action">
+      <span>⬡</span> Action (Dual Outputs: T/F)
+    </div>
+    <div class="palette-item" draggable="true" data-type="goto">
+      <span>◇</span> Goto (Target Pointer)
+    </div>
+    <div class="palette-item" draggable="true" data-type="end">
+      <span>▲</span> End (Triangle)
+    </div>
+  </aside>
+
+  <main id="canvas">
+    <div id="world">
+      <div class="grid-bg"></div>
+      <svg id="svg-connections">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+          </marker>
+          <marker id="arrow-true" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a" />
+          </marker>
+          <marker id="arrow-false" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626" />
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="controls-overlay">
+      <div><b>Auto-Connect:</b> Sequential dropped nodes link automatically</div>
+      <div><b>Pan:</b> Space + Drag / Middle Mouse Drag</div>
+      <div><b>Zoom:</b> Mouse Wheel (<span class="zoom-indicator" id="zoomVal">100%</span>)</div>
+      <div><b>Manual Link:</b> Click output port, then click target node</div>
+    </div>
+  </main>
+
+  <!-- Modal Editor -->
+  <div class="modal-overlay" id="editorModal">
+    <div class="modal">
+      <h3 id="modalTitle">Edit Node Content</h3>
+
+      <div id="variantGroup">
+        <label for="variantSelect">Text Format</label>
+        <select id="variantSelect">
+          <option value="string">Plain String</option>
+          <option value="ordered">Ordered List (1., 2., 3.)</option>
+          <option value="unordered">Unordered List (•)</option>
+        </select>
+      </div>
+
+      <div id="targetContainerGroup" style="display: none;">
+        <label for="containerSelect">Target Container ID</label>
+        <select id="containerSelect"></select>
+      </div>
+
+      <div id="contentGroup">
+        <label for="textContent" id="textLabel">Content / Label</label>
+        <div id="inputContainer"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnCancel">Cancel</button>
+        <button class="btn btn-primary" id="btnSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+ <script src="script.js"></script>
+</body>
+</html>
