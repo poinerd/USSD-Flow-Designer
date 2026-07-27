@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>USSD Flow Canvas Prototype</title>
-<link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css">
+</head>
 <body>
 
   <aside id="sidebar">
@@ -14,6 +15,9 @@
     <div class="palette-item" draggable="true" data-type="container">
       <span>▭</span> Container (Rectangle)
     </div>
+    <!-- <div class="palette-item" draggable="true" data-type="group-container">
+      <span>▢</span> Group Container (No ID)
+    </div> -->
     <div class="palette-item" draggable="true" data-type="text">
       <span>T</span> Text Node (Canvas / Embeddable)
     </div>
@@ -57,6 +61,24 @@
     </div>
   </main>
 
+  <!-- Side Panel for Action Functions -->
+  <aside id="actionPanel" class="action-panel">
+    <div class="panel-header">
+      <h3>Background Functions</h3>
+      <button id="btnCloseActionPanel" class="close-btn">&times;</button>
+    </div>
+    <p class="panel-desc">Drag a function pill into an Action Node:</p>
+    <div class="function-pill" draggable="true" data-func="Password Validation">
+      ⚙ Password Validation
+    </div>
+    <div class="function-pill" draggable="true" data-func="Get Account Numbers">
+      ⚙ Get Account Numbers
+    </div>
+    <div class="function-pill" draggable="true" data-func="Balance Check">
+      ⚙ Balance Check
+    </div>
+  </aside>
+
   <!-- Modal Editor -->
   <div class="modal-overlay" id="editorModal">
     <div class="modal">
@@ -88,6 +110,6 @@
     </div>
   </div>
 
- <script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
