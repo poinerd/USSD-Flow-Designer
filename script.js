@@ -36,12 +36,14 @@ let editingTarget = null;
 let offset = { x: 0, y: 0 };
 
 let containerCounter = 1;
+let zIndexCounter = 2;
 let nodesList = [];
 let connections = [];
 let undoStack = [];
 
 let lastDroppedNode = null;
 let pendingConnection = null;
+let flowFocus = null; // { nodes: Set<node>, conns: Set<connection> } while a flow is isolated
 
 /* LocalStorage Persistence Helper */
 function saveCanvasState() {
@@ -274,6 +276,7 @@ canvas.addEventListener('click', (e) => {
   if (e.target === canvas || e.target === world || e.target === svgCanvas) {
     clearSelection();
     cancelPendingConnection();
+    clearFlowFocus();
   }
 });
 
@@ -329,6 +332,18 @@ function highlightTargetContainer(targetId) {
   });
 }
 
+/* Click handler for a menu option badge: isolate ONLY the branch that option leads to */
+function focusMenuOption(event, optionId, parentContainerId) {
+  if (event) event.stopPropagation();
+  if (!parentContainerId || parentContainerId === 'null') return;
+
+  const parentContainer = document.querySelector(`.node[data-type="container"][data-container-id="${parentContainerId}"]`);
+  if (!parentContainer) return;
+
+  highlightTargetContainer(optionId);
+  focusFlowForOption(parentContainer, optionId);
+}
+
 /* Render text formatting with inherited ID badges */
 function renderFormattedText(text, variant, parentContainerId = null) {
   if (!text || text.trim() === '') return '';
@@ -337,7 +352,7 @@ function renderFormattedText(text, variant, parentContainerId = null) {
   if (variant === 'ordered' || variant === 'unordered') {
     const listItems = lines.map((line, idx) => {
       const optId = generateOptionId(parentContainerId, idx);
-      return `<li data-option-id="${optId}"><span class="option-badge" onclick="event.stopPropagation(); highlightTargetContainer('${optId}')">${optId}</span>${line}</li>`;
+      return `<li data-option-id="${optId}" onclick="focusMenuOption(event, '${optId}', '${parentContainerId}')"><span class="option-badge">${optId}</span>${line}</li>`;
     }).join('');
 
     return variant === 'ordered' ? `<ol>${listItems}</ol>` : `<ul>${listItems}</ul>`;
@@ -748,6 +763,7 @@ function createNode(type, x, y, customContainerId = null) {
   node.className = 'node';
   node.style.left = `${x}px`;
   node.style.top = `${y}px`;
+  node.style.zIndex = String(++zIndexCounter);
   node.dataset.type = type;
   node.dataset.variant = 'string';
   node.dataset.nodeId = Math.random().toString(36).substr(2, 9);
@@ -859,7 +875,12 @@ function createNode(type, x, y, customContainerId = null) {
   });
 
   node.addEventListener('mousedown', (e) => {
-    if (e.target.classList.contains('embedded-node') || e.target.classList.contains('port') || e.target.classList.contains('option-badge')) return;
+    if (
+      e.target.classList.contains('embedded-node') ||
+      e.target.classList.contains('port') ||
+      e.target.classList.contains('option-badge') ||
+      e.target.closest('li[data-option-id]')
+    ) return;
 
     if (pendingConnection && pendingConnection.fromNode !== node) {
       connections = connections.filter(c => !(c.fromNode === pendingConnection.fromNode && c.portType === pendingConnection.portType));
@@ -880,6 +901,10 @@ function createNode(type, x, y, customContainerId = null) {
 
     if (type === 'goto') {
       highlightTargetContainer(node.dataset.targetContainerId);
+    }
+
+    if (type === 'container') {
+      focusFlowForContainer(node);
     }
 
     const rect = node.getBoundingClientRect();
@@ -944,6 +969,95 @@ function getNodeWorldPosition(node) {
   return { x, y };
 }
 
+/*
+ * Forward traversal from startNode: follows every outgoing connection, and
+ * whenever it reaches a group-container, also pulls in ALL of that group's
+ * child menus/gotos (since those aren't linked via `connections`, just DOM
+ * nesting) so the whole downstream tree gets included.
+ */
+function traverseFullFlow(startNode, nodes, conns) {
+  const queue = [startNode];
+  nodes.add(startNode);
+
+  while (queue.length) {
+    const current = queue.shift();
+
+    connections.forEach(c => {
+      if (c.fromNode === current) {
+        conns.add(c);
+        if (!nodes.has(c.toNode)) {
+          nodes.add(c.toNode);
+          queue.push(c.toNode);
+        }
+      }
+    });
+
+    if (current.dataset.type === 'group-container') {
+      Array.from(current.children).forEach(child => {
+        if (child.classList && child.classList.contains('node') && !nodes.has(child)) {
+          nodes.add(child);
+          queue.push(child);
+        }
+      });
+    }
+  }
+}
+
+/* Clicking the menu itself: isolate every possible branch downstream of it */
+function focusFlowForContainer(containerNode) {
+  const nodes = new Set();
+  const conns = new Set();
+  traverseFullFlow(containerNode, nodes, conns);
+  applyFlowFocus(nodes, conns);
+}
+
+/* Clicking one option's badge: isolate only the branch that specific option leads to */
+function focusFlowForOption(containerNode, optionId) {
+  const nodes = new Set();
+  const conns = new Set();
+  nodes.add(containerNode);
+
+  const groupConn = connections.find(c =>
+    c.fromNode === containerNode &&
+    c.portType === 'out' &&
+    c.toNode.dataset.type === 'group-container'
+  );
+
+  if (groupConn) {
+    conns.add(groupConn);
+    const groupContainer = groupConn.toNode;
+    nodes.add(groupContainer);
+
+    const matchedChild = Array.from(groupContainer.children).find(
+      c => c.classList && c.classList.contains('node') && c.dataset.menuOptionId === optionId
+    );
+
+    if (matchedChild) {
+      traverseFullFlow(matchedChild, nodes, conns);
+    }
+  }
+
+  applyFlowFocus(nodes, conns);
+}
+
+/* Dim everything outside the given subgraph, keep the rest fully visible */
+function applyFlowFocus(nodes, conns) {
+  flowFocus = { nodes, conns };
+  nodesList.forEach(n => {
+    n.style.opacity = flowFocus.nodes.has(n) ? '1' : '0.15';
+  });
+  updateConnections();
+}
+
+function clearFlowFocus() {
+  if (!flowFocus) return;
+  flowFocus = null;
+  nodesList.forEach(n => {
+    n.style.opacity = '';
+  });
+  updateConnections();
+}
+
 function getPortCoordinates(node, portType) {
   const pos = getNodeWorldPosition(node);
   const x = pos.x;
@@ -990,6 +1104,11 @@ function updateConnections() {
 
     path.setAttribute('class', strokeClass);
     path.setAttribute('marker-end', marker);
+
+    if (flowFocus) {
+      path.style.opacity = flowFocus.conns.has(conn) ? '1' : '0.15';
+    }
+
     svgCanvas.appendChild(path);
   });
 }
@@ -1125,7 +1244,7 @@ document.addEventListener('mouseup', (e) => {
         newPos: { ...newPos }
       });
     }
-    activeNode.style.zIndex = 2;
+    activeNode.style.zIndex = String(++zIndexCounter);
     activeNode = null;
     saveCanvasState();
   }
